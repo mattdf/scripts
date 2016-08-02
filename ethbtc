@@ -1,0 +1,16 @@
+#!/usr/bin/python
+
+import requests
+import json
+from colorama import Fore
+
+r = requests.get('https://api.coinmarketcap.com/v1/ticker/')
+
+data = r.json()
+
+for currency in data:
+    if currency["symbol"] in ("ETH", "BTC"):
+        color = Fore.RED if (currency["percent_change_24h"] < 0) else Fore.GREEN
+        label = Fore.YELLOW+"%s: " % (currency["symbol"])
+        value = Fore.WHITE+"${:4.2f}"+Fore.RESET
+        print label + value.format(currency["price_usd"]).ljust(18), color+" {:2.2f}%".format(currency["percent_change_24h"])

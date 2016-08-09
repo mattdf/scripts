@@ -1,16 +1,30 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import requests
 import json
 from colorama import Fore
+from time import sleep, localtime, strftime
 
-r = requests.get('https://api.coinmarketcap.com/v1/ticker/')
+print(chr(27) + "[3J" + chr(27) + "[H" + chr(27) + "[2J", end="", flush=True)
+while True:
 
-data = r.json()
+    timestr = strftime('%Y-%m-%d %H:%M:%S', localtime())
 
-for currency in data:
-    if currency["symbol"] in ("ETH", "BTC"):
-        color = Fore.RED if (currency["percent_change_24h"] < 0) else Fore.GREEN
-        label = Fore.YELLOW+"%s: " % (currency["symbol"])
-        value = Fore.WHITE+"${:4.2f}"+Fore.RESET
-        print label + value.format(currency["price_usd"]).ljust(18), color+" {:2.2f}%".format(currency["percent_change_24h"])
+
+    try:
+        r = requests.get('https://api.coinmarketcap.com/v1/ticker/')
+        data = r.json()
+
+        print(chr(27) + "[3J" + chr(27) + "[H" + chr(27) + "[2J", end="", flush=True)
+        print(timestr + "\n")
+        for currency in data:
+            if currency["symbol"] in ("ETH", "BTC", "ETC"):
+                color = Fore.RED if (currency["percent_change_24h"] < 0) else Fore.GREEN
+                label = Fore.YELLOW+"%s: " % (currency["symbol"])
+                value = Fore.WHITE+"${:4.2f}"+Fore.RESET
+                print(label + value.format(currency["price_usd"]).ljust(18), color+" {:2.2f}%".format(currency["percent_change_24h"]) + Fore.RESET)
+    except:
+        print(chr(27) + "[3J" + chr(27) + "[H" + chr(27) + "[2J", end="", flush=True)
+        print(timestr + "\n")
+        print("Unable to connect")
+    sleep(10)

@@ -1,0 +1,34 @@
+#!/usr/bin/python3
+
+import requests
+import json
+from sys import argv
+from colorama import Fore, Style
+
+
+if __name__ == "__main__":
+    try:
+        r = requests.get('https://api.coinmarketcap.com/v1/ticker/ethereum')
+        data = r.json()
+
+        price = float(data[0]["price_usd"])
+
+        total = 0
+        total_eth = 0
+
+        r = requests.get('https://etherchain.org/api/account/multiple/' + ",".join(accounts))
+
+        data = r.json()
+
+        for accdata in data["data"]:
+
+            addr = accdata["address"]
+            bal = accdata["balance"] / (10**18)
+            usd = bal * price
+            total += usd
+            total_eth += bal
+
+            print(Style.BRIGHT + Fore.BLUE + addr + Style.RESET_ALL + ": " + "{:10.2f}".format(bal) + " - " + Fore.YELLOW + "{:10.2f}".format(usd) + Fore.RESET)
+        print(Style.BRIGHT + (' ' * 44) + "{:10.2f}".format(total_eth) + Style.RESET_ALL + " - " + Style.BRIGHT + Fore.YELLOW + "{:10.2f}".format(total) + Style.RESET_ALL)
+    except:
+        print("Unable to connect")

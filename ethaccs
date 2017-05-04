@@ -2,33 +2,139 @@
 
 import requests
 import json
-from sys import argv
+import os
+import getopt
+import sys
 from colorama import Fore, Style
+from time import localtime, strftime
+from os.path import expanduser
 
+
+def getPrices(coins):
+
+    timestr = strftime('%Y-%m-%d %H:%M:%S', localtime())
+    prices = dict()
+
+    try:
+        r = requests.get('https://api.coinmarketcap.com/v1/ticker/')
+        data = r.json()
+
+        print(timestr + "\n")
+        for currency in data:
+            if currency["symbol"] in (coins):
+                chg = float(currency["percent_change_24h"])
+                prc = float(currency["price_usd"])
+                prices[currency["symbol"]] = prc
+                color = Fore.RED if (chg < 0) else Fore.GREEN
+                label = Fore.YELLOW + "%s: " % (currency["symbol"])
+                value = Fore.WHITE + "${:4.2f}" + Fore.RESET
+                change = color + " {:2.2f}%".format(chg)
+                print(label + value.format(prc).ljust(18), change + Fore.RESET)
+    except:
+        print(timestr + "\n")
+        print("Unable to get prices")
+        return False
+
+    return prices
+
+
+def eth_api(addresses):
+    r = requests.get('https://etherchain.org/api/account/multiple/' + ",".join(addresses))
+    return r.json()
+
+
+def ltc_api(addresses):
+    r = requests.get('https://ltc.blockr.io/api/v1/address/info/' + ",".join(addresses))
+    return r.json()
+
+
+def btc_api(addresses):
+    r = requests.get('https://btc.blockr.io/api/v1/address/info/' + ",".join(addresses))
+    return r.json()
+
+api_maps = {
+    "ETH": eth_api,
+    "LTC": ltc_api,
+    "BTC": btc_api
+}
+
+
+def fetch_balances(coin, accounts):
+    bals = dict()
+    data = api_maps[coin](accounts[coin])
+    if type(data["data"]) is not list:
+        data["data"] = [data["data"]]
+    for accdata in data["data"]:
+        addr = accdata["address"]
+        bal = float(accdata["balance"])
+        if coin == "ETH":
+            bal /= (10**18)
+        bals[addr] = bal
+    return bals
+
+currency = "GBP"
+
+accounts = dict()
+
+balances = dict()
+
+ACCSTORE = ".cryptoaccs"
+CACHEFILE = ".cryptoaccs_cache"
+
+balances_cache = False
 
 if __name__ == "__main__":
     try:
-        r = requests.get('https://api.coinmarketcap.com/v1/ticker/ethereum')
-        data = r.json()
+        opts, args = getopt.getopt(sys.argv[1:], "f", [])
+    except getopt.GetoptError:
+        print("only option is -f")
+        exit(1)
 
-        price = float(data[0]["price_usd"])
+    home = expanduser("~") + "/"
+    if os.path.isfile(home + ACCSTORE) is False:
+        print("Please populate " + ACCSTORE + " in your home directory!")
+        exit(1)
 
-        total = 0
-        total_eth = 0
+    if os.path.isfile(home + CACHEFILE):
+        balances_cache = True
+        with open(home + CACHEFILE) as data_file:
+            balances = json.load(data_file)
 
-        r = requests.get('https://etherchain.org/api/account/multiple/' + ",".join(accounts))
+    with open(home + ACCSTORE) as data_file:
+        accounts = json.load(data_file)
 
-        data = r.json()
+    for opt, arg in opts:
+        print(opt)
+        if opt == "-f":
+            balances_cache = False
 
-        for accdata in data["data"]:
+    prices = getPrices(["ETH", "BTC", "ETC", "LTC"])
+    r = requests.get('http://api.fixer.io/latest?symbols=USD,' + currency + '&base=USD')
+    rate = r.json()
+    total = 0
+    for coin in accounts.keys():
 
-            addr = accdata["address"]
-            bal = accdata["balance"] / (10**18)
-            usd = bal * price
-            total += usd
-            total_eth += bal
+        if coin not in api_maps:
+            continue
 
-            print(Style.BRIGHT + Fore.BLUE + addr + Style.RESET_ALL + ": " + "{:10.2f}".format(bal) + " - " + Fore.YELLOW + "{:10.2f}".format(usd) + Fore.RESET)
-        print(Style.BRIGHT + (' ' * 44) + "{:10.2f}".format(total_eth) + Style.RESET_ALL + " - " + Style.BRIGHT + Fore.YELLOW + "{:10.2f}".format(total) + Style.RESET_ALL)
-    except:
-        print("Unable to connect")
+        if coin not in balances:
+            balances[coin] = dict()
+
+        if balances_cache:
+            bals = balances[coin]
+        else:
+            bals = fetch_balances(coin, accounts)
+            balances[coin] = bals
+
+        for acc in bals:
+            price = float(rate["rates"][currency]) * float(prices[coin])
+            val = bals[acc] * price
+            total += val
+            print(Style.BRIGHT + Fore.BLUE + acc + Style.RESET_ALL + ": " + (' ' * (50 - len(acc))) + "{:10.2f}".format(bals[acc]) + " - " + Fore.YELLOW + "{:10.2f}".format(val) + Fore.RESET)
+
+        print("")
+
+    print(Style.BRIGHT + (' ' * 52) + "{:10.2f}".format(0) + Style.RESET_ALL + " - " + Style.BRIGHT + Fore.YELLOW + "{:10.2f}".format(total) + Style.RESET_ALL)
+    if balances_cache is False:
+        with open(home + CACHEFILE, 'w') as fp:
+            json.dump(balances, fp)

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+xlock -mode blank
